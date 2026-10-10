@@ -62,6 +62,12 @@ form.config input { font: 14px var(--mono); border: 2px solid var(--tinta); padd
 .btn { font: 500 14px var(--grotesk); background: var(--tinta); color: var(--fondo); border: 2px solid var(--tinta); padding: 10px 14px; cursor: pointer; }
 .btn.claro { background: var(--fondo); color: var(--tinta); }
 :focus-visible { outline: 3px solid var(--rojo); outline-offset: 2px; }
+.lineas svg { display: block; width: 100%; height: auto; }
+.tabla { display: grid; grid-template-columns: auto 1fr 1fr; gap: 0; border: 2px solid var(--tinta); font-size: 13px; }
+.tabla > div { padding: 7px 8px; border-bottom: 1px solid var(--linea); min-width: 0; }
+.tabla > div:nth-last-child(-n+3) { border-bottom: 0; }
+.tabla .cab { font: 700 11px var(--mono); text-transform: uppercase; background: var(--suave); }
+.tabla .n { font: 700 14px var(--mono); font-variant-numeric: tabular-nums; }
 .pie { padding: 18px 16px 28px; font-size: 12px; color: var(--gris); display: grid; gap: 10px; }
 .cargando { opacity: .55; transition: opacity .2s; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -97,6 +103,22 @@ form.config input { font: 14px var(--mono); border: 2px solid var(--tinta); padd
     </div>
 
     <div class="seccion">
+      <p class="rotulo">Adentro vs afuera</p>
+      <p class="lectura" id="xVer">–</p>
+      <div class="cajas">
+        <div class="caja"><div class="et">Diferencia</div><b id="xDif">–</b><span id="xDif2"></span></div>
+        <div class="caja"><div class="et">Agua en el aire</div><b id="xAgua">–</b><span id="xAgua2"></span></div>
+        <div class="caja"><div class="et">La cabaña amortigua</div><b id="xAmort">–</b><span id="xAmort2"></span></div>
+        <div class="caja"><div class="et">Sigue a afuera con</div><b id="xRet">–</b><span id="xRet2"></span></div>
+      </div>
+      <p class="rotulo" style="margin-top:22px">24 horas atrás · 12 adelante</p>
+      <p class="nota">Negro: adentro · rojo: afuera según el SMN · amarillo: afuera según Open-Meteo · punteado: pronóstico</p>
+      <div class="lineas" id="xGraf"></div>
+      <p class="rotulo" style="margin-top:22px">Afuera ahora · dos fuentes</p>
+      <div class="tabla" id="xFuentes"></div>
+    </div>
+
+    <div class="seccion">
       <p class="rotulo">Pronóstico · próxima hora</p>
       <p class="lectura" id="pVer">–</p>
       <div class="cajas">
@@ -109,7 +131,7 @@ form.config input { font: 14px var(--mono); border: 2px solid var(--tinta); padd
 
     <div class="seccion">
       <p class="rotulo">Esta noche · cabaña vs afuera</p>
-      <p class="nota">Barras: la cabaña estimada · abajo: afuera y lluvia según Open-Meteo</p>
+      <p class="nota" id="nNota">Barras: la cabaña estimada · abajo: afuera y lluvia</p>
       <p class="lectura" id="nVer">–</p>
       <div class="graf" id="nGraf"></div>
       <div class="ejes" id="nHoras"></div>
@@ -133,7 +155,9 @@ form.config input { font: 14px var(--mono); border: 2px solid var(--tinta); padd
     </div>
 
     <div class="pie">
-      <span>Los límites, el lugar y el refresco de la tinta se cambian en la pestaña <b>config</b> de la hoja de Epicmotchi.</span>
+      <span id="ubic">–</span>
+      <span><button class="btn" id="miUbic" type="button">Usar la ubicación de mi cel</button></span>
+      <span>Los límites y el refresco de la tinta se cambian en la pestaña <b>config</b> de la hoja de Epicmotchi.</span>
       <span><button class="btn claro" id="cambiar" type="button">Cambiar puente</button></span>
     </div>
   </div>
@@ -162,18 +186,20 @@ function guardarConfig(c) { try { localStorage.setItem('sensor.puente', JSON.str
 })();
 
 // ---------- Datos ----------
-let datos = null, afuera = null, afueraLugar = '';
+let datos = null, afuera = null, afueraLugar = '', smn = null;
 async function cargar() {
   const c = leerConfig();
   if (!c) { mostrar('config'); return; }
   document.body.classList.add('cargando');
   try {
-    const r = await fetch(`${c.url}?vista=sensor&minutos=180&clave=${encodeURIComponent(c.clave || '')}`, { cache: 'no-store' });
+    const r = await fetch(`${c.url}?vista=sensor&minutos=1440&clave=${encodeURIComponent(c.clave || '')}`, { cache: 'no-store' });
     const d = await r.json();
     if (d.ok === false) throw new Error(d.error === 'clave' ? 'La clave no coincide con la del puente.' : d.error);
     d.lecturas.sort((a, b) => a.epoch - b.epoch);
+    // En cuanto hay lecturas de la placa, se ignoran las de prueba.
+    if (d.lecturas.some(x => x.dispositivo !== 'prueba')) d.lecturas = d.lecturas.filter(x => x.dispositivo !== 'prueba');
     datos = d;
-    await cargarAfuera(d.ajustes);
+    await Promise.all([cargarAfuera(d.ajustes), cargarSmn()]);
     pintar();
   } catch (e) {
     if (!datos) { mostrar('vacio'); $('vacio').innerHTML = `<p><b>No pude leer el puente.</b></p><p>${e.message || e}</p><p><button class="btn claro" type="button" onclick="mostrar('config')">Revisar la dirección</button></p>`; }
@@ -183,10 +209,15 @@ async function cargarAfuera(aj) {
   const lugar = `${aj.lat},${aj.lon}`;
   if (afuera && afueraLugar === lugar && Date.now() - afuera.cuando < 30 * 60 * 1000) return;
   try {
-    const u = `https://api.open-meteo.com/v1/forecast?latitude=${aj.lat}&longitude=${aj.lon}&hourly=temperature_2m,precipitation_probability&current=temperature_2m&forecast_days=2&timezone=auto`;
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${aj.lat}&longitude=${aj.lon}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability&current=temperature_2m,relative_humidity_2m&past_days=1&forecast_days=2&timeformat=unixtime&timezone=auto`;
     const d = await (await fetch(u)).json();
     afuera = { cuando: Date.now(), d }; afueraLugar = lugar;
   } catch (e) { afuera = null; }
+}
+
+// El SMN lo descarga GitHub cada 3 horas (herramientas/smn.py) y lo deja junto a esta página.
+async function cargarSmn() {
+  try { const r = await fetch('smn.json', { cache: 'no-store' }); smn = r.ok ? await r.json() : null; } catch (e) { smn = null; }
 }
 
 // ---------- Pronóstico (con minutos) ----------
@@ -213,16 +244,60 @@ function proyector(crudo, tope, lo, hi) {
   return min => Math.max(lo, Math.min(hi, actual + Math.max(-tope, Math.min(tope, s1 * tau * (1 - Math.exp(-min / tau))))));
 }
 function rocio(t, h) { const a = 17.62, b = 243.12, g = Math.log(Math.max(h, 1) / 100) + a * t / (b + t); return b * g / (a - g); }
-const TAU_NOCHE = 5, ABRIGO = 4; // la cabaña se acerca a afuera + 4° con 5 h de retraso (se calibrará con datos reales)
 
+// Próximas 12 horas de afuera: el SMN si cubre, si no Open-Meteo.
 function horasAfuera() {
-  if (!afuera) return null;
-  const h = afuera.d.hourly, ahora = Date.now(), out = [];
-  for (let i = 0; i < h.time.length && out.length < 12; i++) {
-    const t = new Date(h.time[i]).getTime();
-    if (t > ahora) out.push({ h: new Date(h.time[i]).getHours(), fuera: h.temperature_2m[i], lluvia: h.precipitation_probability ? h.precipitation_probability[i] : null });
+  const ahora = Date.now() / 1000, out = [];
+  if (smn && smn.horas) {
+    for (const x of smn.horas) if (x.epoch > ahora && out.length < 12 && x.temp != null)
+      out.push({ epoch: x.epoch, h: new Date(x.epoch * 1000).getHours(), fuera: x.temp, hr: x.hr, lluvia: x.probprec, fuente: 'SMN' });
+    if (out.length >= 6) return out;
   }
+  if (!afuera) return null;
+  const h = afuera.d.hourly; out.length = 0;
+  for (let i = 0; i < h.time.length && out.length < 12; i++) if (h.time[i] > ahora)
+    out.push({ epoch: h.time[i], h: new Date(h.time[i] * 1000).getHours(), fuera: h.temperature_2m[i], hr: h.relative_humidity_2m?.[i], lluvia: h.precipitation_probability?.[i], fuente: 'Open-Meteo' });
   return out;
+}
+// Afuera en una hora dada (epoch), de cada fuente.
+function smnEn(ep) { if (!smn) return null; let b = null; for (const x of smn.horas) if (Math.abs(x.epoch - ep) <= 1800 && x.temp != null) b = x; return b; }
+function omEn(ep) {
+  if (!afuera) return null; const h = afuera.d.hourly;
+  for (let i = 0; i < h.time.length; i++) if (Math.abs(h.time[i] - ep) <= 1800) return { temp: h.temperature_2m[i], hr: h.relative_humidity_2m?.[i] };
+  return null;
+}
+// Gramos de agua por metro cúbico: compara aire de adentro y de afuera aunque estén a distinta temperatura.
+function aguaAire(t, hr) { return 6.112 * Math.exp(17.67 * t / (t + 243.5)) * hr * 2.1674 / (273.15 + t); }
+
+// ---------- Cruce adentro / afuera ----------
+// Promedios por hora de adentro (24 h) contra afuera (Open-Meteo, que trae las horas pasadas). Con 12 horas o más
+// aprende cómo sigue la cabaña a afuera: cada hora, adentro se acerca a (afuera + abrigo) una fracción a = 1/tau.
+let modelo = { tau: 5, abrigo: 4, aprendido: false, horas: 0 };
+function cruce() {
+  const L = datos.lecturas, porHora = new Map();
+  for (const x of L) { const k = Math.floor(x.epoch / 3600) * 3600; if (!porHora.has(k)) porHora.set(k, []); porHora.get(k).push(x); }
+  const horas = [...porHora.keys()].sort((a, b) => a - b).map(k => {
+    const xs = porHora.get(k); return { epoch: k + 1800, t: prom(xs.map(x => x.t)), h: prom(xs.map(x => x.h)), n: xs.length };
+  }).filter(x => x.n >= 10);
+  const pares = [];
+  for (let i = 0; i + 1 < horas.length; i++) {
+    if (horas[i + 1].epoch - horas[i].epoch !== 3600) continue;
+    const e = omEn(horas[i].epoch); if (!e) continue;
+    pares.push({ x: e.temp - horas[i].t, y: horas[i + 1].t - horas[i].t, e: e.temp, i: horas[i].t });
+  }
+  modelo = { tau: 5, abrigo: 4, aprendido: false, horas: pares.length };
+  if (pares.length >= 12) {
+    const n = pares.length, mx = prom(pares.map(p => p.x)), my = prom(pares.map(p => p.y));
+    let sxy = 0, sxx = 0; pares.forEach(p => { sxy += (p.x - mx) * (p.y - my); sxx += (p.x - mx) ** 2; });
+    const a = sxx ? sxy / sxx : 0, c = my - a * mx;
+    if (a > 0.02 && a < 1) modelo = { tau: 1 / a, abrigo: c / a, aprendido: true, horas: n };
+  }
+  let amort = null;
+  if (pares.length >= 12) {
+    const ri = Math.max(...pares.map(p => p.i)) - Math.min(...pares.map(p => p.i)), re = Math.max(...pares.map(p => p.e)) - Math.min(...pares.map(p => p.e));
+    if (re > 1) amort = 1 - ri / re;
+  }
+  return { horas, amort };
 }
 
 function analizar() {
@@ -238,7 +313,7 @@ function analizar() {
   const horas = horasAfuera();
   let noche = null, minNoche = null, empana = false, lluviaMax = 0;
   if (horas && horas.length) {
-    let tin = base; noche = horas.map(x => { tin += (x.fuera + ABRIGO - tin) / TAU_NOCHE; return { ...x, cab: tin }; });
+    let tin = base; noche = horas.map(x => { tin += (x.fuera + modelo.abrigo - tin) / modelo.tau; return { ...x, cab: tin }; });
     minNoche = noche.reduce((a, b) => b.cab < a.cab ? b : a);
     empana = Math.min(...noche.map(x => x.fuera)) < rocio(ult.t, ult.h);
     lluviaMax = Math.max(0, ...noche.map(x => x.lluvia || 0));
@@ -295,6 +370,7 @@ function pintar() {
     return;
   }
   mostrar('tablero');
+  const cx = cruce();   // primero: aprende el modelo que usa el pronóstico de la noche
   const f = analizar(), { ult, aj } = f, edad = datos.ahora - ult.epoch;
   $('tActual').textContent = `↻ Última lectura ${hace(edad)} · la placa reporta cada 5 min · límite ${aj.limite_t}° y ${aj.limite_h}%`;
   const chips = [];
@@ -308,11 +384,13 @@ function pintar() {
   $('aH').textContent = `${Math.round(ult.h)}%`;
   $('aH2').innerHTML = ult.h >= aj.limite_h ? `<span class="rojo-t">▲ arriba de ${aj.limite_h}%</span>` : `límite ${aj.limite_h}%`;
   $('aR').textContent = `${n1(rocio(ult.t, ult.h))}°C`;
-  if (afuera) {
-    const fa = afuera.d.current?.temperature_2m;
-    $('aF').textContent = fa != null ? `${n1(fa)}°C` : '–';
-    $('aF2').textContent = fa != null ? `${ult.t - fa >= 0 ? '+' : ''}${n1(ult.t - fa)}° adentro · Open-Meteo` : 'Open-Meteo';
-  } else { $('aF').textContent = '–'; $('aF2').textContent = 'sin pronóstico de afuera'; }
+  const ahoraEp = Date.now() / 1000, sNow = smnEn(Math.floor(ahoraEp / 3600) * 3600), oNow = afuera?.d.current;
+  const fuera = sNow ? { t: sNow.temp, h: sNow.hr, fuente: 'SMN' } : oNow ? { t: oNow.temperature_2m, h: oNow.relative_humidity_2m, fuente: 'Open-Meteo' } : null;
+  if (fuera) {
+    $('aF').textContent = `${n1(fuera.t)}°C`;
+    $('aF2').textContent = `${Math.round(fuera.h)}% · ${fuera.fuente}`;
+  } else { $('aF').textContent = '–'; $('aF2').textContent = 'sin datos de afuera'; }
+  pintarCruce(f, cx, fuera);
 
   // pronóstico
   $('pVer').innerHTML = (f.v.alerta ? '<span class="rojo-t">▲</span> ' : '✓ ') + f.v.txt;
@@ -327,6 +405,7 @@ function pintar() {
 
   // noche
   if (f.noche) {
+    $('nNota').textContent = `Barras: la cabaña estimada${modelo.aprendido ? ' con lo que aprendió' : ''} · abajo: afuera y lluvia según ${f.noche[0].fuente}`;
     $('nVer').innerHTML = `Mínima de ${n1(f.minNoche.cab)}° a las ${hh(f.minNoche.h)}` +
       (f.minNoche.cab < 16 ? ' <span class="rojo-t">· pide cobija extra</span>' : '') +
       (f.empana ? ' · los vidrios se empañan' : '') + (f.lluviaMax >= 40 ? ` · lluvia ${f.lluviaMax}%` : '');
@@ -349,6 +428,90 @@ function pintar() {
     barras('hGraf', gh.map(g => g.v), gh.map(g => g.et), aj.limite_h, 'hEjes', v => Math.round(v), v => v >= aj.limite_h);
   }
 }
+
+function pintarCruce(f, cx, fuera) {
+  const { aj } = f, tin = f.base, hin = f.ult.h;
+  // recomendación
+  let v = 'Sin datos de afuera todavía', alerta = false;
+  if (fuera) {
+    const ain = aguaAire(tin, hin), ae = aguaAire(fuera.t, fuera.h);
+    if (tin >= aj.limite_t && fuera.t < tin - 2) { v = `Abre la ventana: afuera está ${n1(tin - fuera.t)}° más fresco`; alerta = true; }
+    else if (hin >= aj.limite_h && ae < ain - 1) { v = 'Abre un rato: el aire de afuera es más seco y saca la humedad'; alerta = true; }
+    else if (ae > ain + 1 && hin >= 55) v = 'Mejor cerrado: el aire de afuera trae más humedad';
+    else if (fuera.t < 16 && tin - fuera.t > 4) v = `Mantén cerrado: afuera hace ${n1(fuera.t)}° y la cabaña guarda ${n1(tin - fuera.t)}°`;
+    else v = 'Adentro y afuera en equilibrio: no hace falta ventilar';
+    const d = tin - fuera.t;
+    $('xDif').textContent = `${d >= 0 ? '+' : ''}${n1(d)}°`;
+    $('xDif2').textContent = `adentro ${d >= 0 ? 'más cálido' : 'más fresco'} que afuera (${fuera.fuente})`;
+    $('xAgua').textContent = `${n1(ain)} g`;
+    $('xAgua2').innerHTML = `por m³ adentro · afuera ${n1(ae)} g${ae > ain + 1 ? ' <span class="rojo-t">▲</span>' : ''}`;
+  } else { ['xDif', 'xAgua'].forEach(id => $(id).textContent = '–'); $('xDif2').textContent = ''; $('xAgua2').textContent = ''; }
+  $('xVer').innerHTML = (alerta ? '<span class="rojo-t">▲</span> ' : '✓ ') + v;
+  if (modelo.aprendido) {
+    $('xAmort').textContent = cx.amort != null ? `${Math.round(cx.amort * 100)}%` : '–';
+    $('xAmort2').textContent = 'del cambio de afuera, en 24 h';
+    $('xRet').textContent = `${n1(modelo.tau)} h`;
+    $('xRet2').textContent = `de retraso · guarda ${modelo.abrigo >= 0 ? '+' : ''}${n1(modelo.abrigo)}° sobre afuera`;
+  } else {
+    $('xAmort').textContent = 'aprendiendo'; $('xAmort2').textContent = `${modelo.horas} de 12 horas con datos`;
+    $('xRet').textContent = 'aprendiendo'; $('xRet2').textContent = 'mientras: 5 h y +4°, valores típicos';
+  }
+  // gráfica de líneas: 24 h atrás y 12 adelante
+  const W = 360, H = 190, x0 = 30, x1 = 352, y0 = 12, y1 = 160, ahora = Date.now() / 1000, ini = ahora - 86400, fin = ahora + 43200;
+  const X = ep => x0 + (ep - ini) / (fin - ini) * (x1 - x0);
+  const series = [];
+  series.push({ col: 'var(--tinta)', pts: cx.horas.filter(p => p.epoch >= ini).map(p => [p.epoch, p.t]), w: 3 });
+  if (f.noche) series.push({ col: 'var(--tinta)', pts: [[ahora, tin], ...f.noche.map(p => [p.epoch, p.cab])], w: 2.5, punteada: true });
+  const corta = (pts) => [pts.filter(p => p[0] <= ahora), pts.filter(p => p[0] >= ahora - 3600)];
+  if (smn) { const [a, b] = corta(smn.horas.filter(p => p.epoch >= ini && p.epoch <= fin && p.temp != null).map(p => [p.epoch, p.temp])); series.push({ col: 'var(--rojo)', pts: a, w: 2.5 }, { col: 'var(--rojo)', pts: b, w: 2.5, punteada: true }); }
+  if (afuera) {
+    const h = afuera.d.hourly, pts = h.time.map((t, i) => [t, h.temperature_2m[i]]).filter(p => p[0] >= ini && p[0] <= fin);
+    const [a, b] = corta(pts); series.push({ col: 'var(--amarillo)', pts: a, w: 2.5 }, { col: 'var(--amarillo)', pts: b, w: 2.5, punteada: true });
+  }
+  const vals = series.flatMap(s => s.pts.map(p => p[1]));
+  if (!vals.length) { $('xGraf').innerHTML = ''; } else {
+    const lo = Math.floor(Math.min(...vals) - 1), hi = Math.ceil(Math.max(...vals) + 1), Y = v => y1 - (v - lo) / (hi - lo) * (y1 - y0);
+    let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Temperatura de adentro y de afuera, 24 horas atrás y 12 adelante">`;
+    for (let v = lo; v <= hi; v += Math.max(1, Math.round((hi - lo) / 5))) g += `<line x1="${x0}" x2="${x1}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--linea)" stroke-width="1"/><text x="${x0 - 4}" y="${Y(v) + 3}" font-size="9" text-anchor="end" font-family="Space Mono, monospace" fill="var(--gris)">${v}°</text>`;
+    g += `<line x1="${X(ahora)}" x2="${X(ahora)}" y1="${y0}" y2="${y1}" stroke="var(--tinta)" stroke-width="1.5"/>`;
+    for (const s of series) if (s.pts.length > 1)
+      g += `<polyline fill="none" stroke="${s.col}" stroke-width="${s.w}" stroke-linejoin="round" ${s.punteada ? 'stroke-dasharray="5 4"' : ''} points="${s.pts.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ')}"/>`;
+    g += `<line x1="${x0}" x2="${x1}" y1="${y1}" y2="${y1}" stroke="var(--tinta)" stroke-width="2"/>`;
+    [[ini, '-24h', 'start'], [ahora - 43200, '-12h', 'middle'], [ahora, 'Ahora', 'middle'], [fin, '+12h', 'end']].forEach(([ep, t, a]) =>
+      g += `<text x="${X(ep)}" y="${y1 + 16}" font-size="9.5" text-anchor="${a}" font-family="Space Mono, monospace" font-weight="${t === 'Ahora' ? 700 : 400}" fill="var(--tinta)">${t}</text>`);
+    $('xGraf').innerHTML = g + '</svg>';
+  }
+  // dos fuentes
+  const ep = Math.floor(ahora / 3600) * 3600, sm = smnEn(ep), om = afuera?.d.current;
+  const fila = (k, a, b) => `<div>${k}</div><div class="n">${a}</div><div class="n">${b}</div>`;
+  let t = '<div class="cab"></div><div class="cab">SMN</div><div class="cab">Open-Meteo</div>';
+  t += fila('Temperatura', sm ? `${n1(sm.temp)}°` : '–', om ? `${n1(om.temperature_2m)}°` : '–');
+  t += fila('Humedad', sm ? `${Math.round(sm.hr)}%` : '–', om ? `${Math.round(om.relative_humidity_2m)}%` : '–');
+  t += fila('Cielo', sm ? sm.cielo || '–' : '–', '–');
+  if (sm && om) t += fila('Diferencia', `${n1(Math.abs(sm.temp - om.temperature_2m))}°`, `${Math.round(Math.abs(sm.hr - om.relative_humidity_2m))}%`);
+  $('xFuentes').innerHTML = t;
+  $('ubic').innerHTML = smn ? `Afuera: <b>${smn.municipio}, ${smn.estado}</b> (SMN, a ${smn.distancia_km} km de la ubicación guardada).` : 'Afuera: ubicación guardada en el puente.';
+}
+
+// ---------- Ubicación del celular ----------
+$('miUbic').onclick = () => {
+  const b = $('miUbic');
+  if (!navigator.geolocation) { b.textContent = 'Este navegador no da la ubicación'; return; }
+  b.disabled = true; b.textContent = 'Pidiendo la ubicación…';
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const c = leerConfig();
+      const r = await fetch(c.url, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ tipo: 'ubicacion', clave: c.clave || '', lat: pos.coords.latitude, lon: pos.coords.longitude }) });
+      const d = await r.json();
+      if (d.ok === false) throw new Error(d.error);
+      b.textContent = 'Ubicación guardada. El SMN se actualiza en las próximas 3 horas';
+      afuera = null; cargar();
+    } catch (e) { b.textContent = 'No se pudo guardar: ' + (e.message || e); }
+    b.disabled = false;
+  }, err => { b.disabled = false; b.textContent = err.code === 1 ? 'Sin permiso de ubicación: actívalo en los ajustes del cel' : 'No se pudo obtener la ubicación'; },
+  { enableHighAccuracy: false, timeout: 15000, maximumAge: 600000 });
+};
 
 // ---------- Eventos ----------
 $('config').addEventListener('submit', e => {
