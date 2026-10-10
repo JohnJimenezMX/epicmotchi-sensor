@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Sensor">
+<meta name="robots" content="noindex">
+<title>Sensor · Cabaña</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* Una columna para el teléfono, con el lenguaje de Pauta Meta y los colores de la tinta. */
+:root {
+  --fondo: #ffffff; --tinta: #111111; --gris: #5f5f5f; --linea: #dcdcd6; --suave: #f3f2ee;
+  --rojo: #c8231b; --amarillo: #e2b428;
+  --grotesk: 'Space Grotesk', -apple-system, 'Helvetica Neue', sans-serif;
+  --mono: 'Space Mono', ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--fondo); color: var(--tinta); }
+body { font: 15px/1.4 var(--grotesk); padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+main { max-width: 560px; margin: 0 auto; }
+button { font: inherit; color: inherit; }
+.barra { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: 1fr auto; background: var(--tinta); color: var(--fondo); padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top, 0px)); margin-top: calc(-1 * env(safe-area-inset-top, 0px)); align-items: center; }
+.barra b { font: 700 15px var(--grotesk); }
+.barra button { background: none; border: 2px solid var(--fondo); color: var(--fondo); padding: 4px 10px; font: 700 12px var(--mono); cursor: pointer; }
+.titulo { padding: 18px 16px 14px; border-bottom: 3px solid var(--tinta); }
+.titulo h1 { font-size: 27px; margin: 0 0 4px; font-weight: 700; text-wrap: balance; }
+.titulo small { font-size: 13px; color: #333; }
+.chip { display: inline-block; font: 700 11px var(--mono); padding: 3px 7px; background: var(--amarillo); color: var(--tinta); margin-top: 8px; letter-spacing: .03em; }
+.chip.rojo { background: var(--rojo); color: var(--fondo); }
+.seccion { padding: 18px 16px; border-bottom: 1px solid var(--linea); }
+.rotulo { font: 700 12px var(--mono); letter-spacing: .05em; text-transform: uppercase; margin: 0 0 12px; }
+.nota { font-size: 12px; color: var(--gris); margin: 0 0 8px; }
+.lectura { font-size: 16px; font-weight: 700; margin: 0 0 14px; text-wrap: balance; }
+.cajas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.caja { border: 2px solid var(--tinta); padding: 10px 12px 12px; min-width: 0; }
+.caja .et { font-size: 13px; color: #333; }
+.caja b { display: block; font: 700 clamp(20px, 6.4vw, 26px) var(--mono); margin: 8px 0 6px; font-variant-numeric: tabular-nums; }
+.caja > span { font-size: 12px; color: #444; display: block; }
+.rojo-t { color: var(--rojo); font-weight: 700; }
+.graf { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 160px; border-bottom: 2px solid var(--tinta); margin-top: 22px; }
+.graf .b { flex: 1; background: var(--tinta); position: relative; min-width: 0; }
+.graf .b.abierta { background: var(--fondo); border: 2px solid var(--tinta); border-bottom: 0; }
+.graf .b.alerta { background: var(--rojo); }
+.graf .b i { position: absolute; top: -17px; left: 50%; transform: translateX(-50%); font: 9.5px var(--mono); font-style: normal; white-space: nowrap; }
+.graf .lim { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--rojo); }
+.ejes { display: flex; gap: 4px; margin-top: 6px; }
+.ejes span { flex: 1; min-width: 0; text-align: center; font: 9.5px var(--mono); color: #444; }
+.ejes.fuerte span:last-child { font-weight: 700; color: var(--tinta); }
+.fila-et { display: flex; justify-content: space-between; font: 10px var(--mono); color: var(--gris); margin-top: 4px; }
+.vacio { padding: 40px 16px; text-align: center; color: var(--gris); }
+form.config { display: grid; gap: 12px; padding: 20px 16px; }
+form.config label { display: grid; gap: 6px; font-weight: 500; }
+form.config input { font: 14px var(--mono); border: 2px solid var(--tinta); padding: 10px; width: 100%; min-width: 0; }
+.btn { font: 500 14px var(--grotesk); background: var(--tinta); color: var(--fondo); border: 2px solid var(--tinta); padding: 10px 14px; cursor: pointer; }
+.btn.claro { background: var(--fondo); color: var(--tinta); }
+:focus-visible { outline: 3px solid var(--rojo); outline-offset: 2px; }
+.pie { padding: 18px 16px 28px; font-size: 12px; color: var(--gris); display: grid; gap: 10px; }
+.cargando { opacity: .55; transition: opacity .2s; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="barra"><b>Yo Épico · Sensor</b><button id="actualizar" type="button">ACTUALIZAR</button></div>
+
+  <form class="config" id="config" hidden>
+    <h1 style="margin:0;font-size:24px">Conecta tu puente</h1>
+    <p class="nota" style="margin:0">La dirección y la clave se guardan solo en este teléfono. No viajan a GitHub.</p>
+    <label for="cUrl">Dirección del puente (termina en /exec)<input id="cUrl" type="url" required placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <label for="cClave">Clave (vacía si el puente no tiene)<input id="cClave" type="text" autocomplete="off"></label>
+    <button class="btn" type="submit">Guardar y ver el sensor</button>
+  </form>
+
+  <div id="tablero" hidden>
+    <div class="titulo">
+      <h1 id="tLugar">Sensor · Cabaña</h1>
+      <small id="tActual">–</small>
+      <div id="tChips"></div>
+    </div>
+
+    <div class="seccion">
+      <p class="rotulo">Ahora</p>
+      <div class="cajas">
+        <div class="caja"><div class="et">Temperatura</div><b id="aT">–</b><span id="aT2"></span></div>
+        <div class="caja"><div class="et">Humedad</div><b id="aH">–</b><span id="aH2"></span></div>
+        <div class="caja"><div class="et">Punto de rocío</div><b id="aR">–</b><span>abajo de esto se moja el vidrio</span></div>
+        <div class="caja"><div class="et">Afuera</div><b id="aF">–</b><span id="aF2">Open-Meteo</span></div>
+      </div>
+    </div>
+
+    <div class="seccion">
+      <p class="rotulo">Pronóstico · próxima hora</p>
+      <p class="lectura" id="pVer">–</p>
+      <div class="cajas">
+        <div class="caja"><div class="et">En 30 min</div><b id="p30">–</b><span id="p30b"></span></div>
+        <div class="caja"><div class="et">En 1 hora</div><b id="p60">–</b><span id="p60b"></span></div>
+        <div class="caja"><div class="et">Límite de <span id="pLimN">26</span>°</div><b id="pLim">–</b><span id="pLimb"></span></div>
+        <div class="caja"><div class="et">Confianza</div><b id="pConf">–</b><span id="pConfb"></span></div>
+      </div>
+    </div>
+
+    <div class="seccion">
+      <p class="rotulo">Esta noche · cabaña vs afuera</p>
+      <p class="nota">Barras: la cabaña estimada · abajo: afuera y lluvia según Open-Meteo</p>
+      <p class="lectura" id="nVer">–</p>
+      <div class="graf" id="nGraf"></div>
+      <div class="ejes" id="nHoras"></div>
+      <div class="ejes" id="nFuera"></div>
+      <div class="ejes" id="nLluvia"></div>
+    </div>
+
+    <div class="seccion">
+      <p class="rotulo">Temperatura · 3 horas</p>
+      <p class="nota">Cada barra: 15 minutos · línea punteada: límite · barra hueca: sigue abierta</p>
+      <p class="lectura" id="gVer">–</p>
+      <div class="graf" id="gGraf"></div>
+      <div class="ejes fuerte" id="gEjes"></div>
+    </div>
+
+    <div class="seccion">
+      <p class="rotulo">Humedad · 3 horas</p>
+      <p class="lectura" id="hVer">–</p>
+      <div class="graf" id="hGraf" style="height:110px"></div>
+      <div class="ejes fuerte" id="hEjes"></div>
+    </div>
+
+    <div class="pie">
+      <span>Los límites, el lugar y el refresco de la tinta se cambian en la pestaña <b>config</b> de la hoja de Epicmotchi.</span>
+      <span><button class="btn claro" id="cambiar" type="button">Cambiar puente</button></span>
+    </div>
+  </div>
+
+  <div class="vacio" id="vacio" hidden></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const n1 = v => (Math.round(v * 10) / 10).toFixed(1);
+const hh = h => `${String(h).padStart(2, '0')}:00`;
+const prom = a => a.reduce((s, v) => s + v, 0) / a.length;
+
+// ---------- Configuración en este teléfono ----------
+function leerConfig() {
+  try { return JSON.parse(localStorage.getItem('sensor.puente') || 'null'); } catch (e) { return null; }
+}
+function guardarConfig(c) { try { localStorage.setItem('sensor.puente', JSON.stringify(c)); } catch (e) {} }
+// Enlace de instalación: #p=<id de la implementación> (y opcional &k=<clave>). El # no se manda a ningún servidor.
+(function desdeEnlace() {
+  const m = location.hash.match(/p=([A-Za-z0-9_-]{20,})(?:&k=([^&]*))?/);
+  if (m) {
+    guardarConfig({ url: `https://script.google.com/macros/s/${m[1]}/exec`, clave: decodeURIComponent(m[2] || '') });
+    history.replaceState(null, '', location.pathname);
+  }
+})();
+
+// ---------- Datos ----------
+let datos = null, afuera = null, afueraLugar = '';
+async function cargar() {
+  const c = leerConfig();
+  if (!c) { mostrar('config'); return; }
+  document.body.classList.add('cargando');
+  try {
+    const r = await fetch(`${c.url}?vista=sensor&minutos=180&clave=${encodeURIComponent(c.clave || '')}`, { cache: 'no-store' });
+    const d = await r.json();
+    if (d.ok === false) throw new Error(d.error === 'clave' ? 'La clave no coincide con la del puente.' : d.error);
+    d.lecturas.sort((a, b) => a.epoch - b.epoch);
+    datos = d;
+    await cargarAfuera(d.ajustes);
+    pintar();
+  } catch (e) {
+    if (!datos) { mostrar('vacio'); $('vacio').innerHTML = `<p><b>No pude leer el puente.</b></p><p>${e.message || e}</p><p><button class="btn claro" type="button" onclick="mostrar('config')">Revisar la dirección</button></p>`; }
+  } finally { document.body.classList.remove('cargando'); }
+}
+async function cargarAfuera(aj) {
+  const lugar = `${aj.lat},${aj.lon}`;
+  if (afuera && afueraLugar === lugar && Date.now() - afuera.cuando < 30 * 60 * 1000) return;
+  try {
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${aj.lat}&longitude=${aj.lon}&hourly=temperature_2m,precipitation_probability&current=temperature_2m&forecast_days=2&timezone=auto`;
+    const d = await (await fetch(u)).json();
+    afuera = { cuando: Date.now(), d }; afueraLugar = lugar;
+  } catch (e) { afuera = null; }
+}
+
+// ---------- Pronóstico (con minutos) ----------
+function pendiente(arr) { // grados por minuto
+  const n = arr.length; if (n < 4) return { m: 0, r2: 0 };
+  let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  arr.forEach((y, x) => { sx += x; sy += y; sxx += x * x; sxy += x * y; });
+  const m = (n * sxy - sx * sy) / (n * sxx - sx * sx), b = (sy - m * sx) / n, my = sy / n;
+  let ssr = 0, sst = 0; arr.forEach((y, x) => { ssr += (y - (m * x + b)) ** 2; sst += (y - my) ** 2; });
+  return { m, r2: sst ? 1 - ssr / sst : 0 };
+}
+// Compara los últimos 10 minutos con los 10 anteriores: si el cambio se frena, estima dónde se estabiliza.
+// Mediana de 3: quita picos sueltos (una lectura rara no debe mover el pronóstico).
+function sinPicos(arr) { return arr.map((v, i) => i === 0 || i === arr.length - 1 ? v : [arr[i - 1], v, arr[i + 1]].sort((a, b) => a - b)[1]); }
+function proyector(crudo, tope, lo, hi) {
+  const arr = sinPicos(crudo);
+  if (arr.length > 2) arr[arr.length - 1] = [arr[arr.length - 3], arr[arr.length - 2], crudo[crudo.length - 1]].sort((a, b) => a - b)[1];
+  const actual = arr[arr.length - 1];
+  if (arr.length < 20) return () => actual;
+  const s1 = pendiente(arr.slice(-10)).m, s0 = pendiente(arr.slice(-20, -10)).m;
+  let tau = 30;
+  if (Math.sign(s1) === Math.sign(s0) && Math.abs(s1) < Math.abs(s0) * 0.95 && Math.abs(s1) > 0.002)
+    tau = Math.min(180, Math.max(5, 10 / Math.log(Math.abs(s0) / Math.abs(s1))));
+  return min => Math.max(lo, Math.min(hi, actual + Math.max(-tope, Math.min(tope, s1 * tau * (1 - Math.exp(-min / tau))))));
+}
+function rocio(t, h) { const a = 17.62, b = 243.12, g = Math.log(Math.max(h, 1) / 100) + a * t / (b + t); return b * g / (a - g); }
+const TAU_NOCHE = 5, ABRIGO = 4; // la cabaña se acerca a afuera + 4° con 5 h de retraso (se calibrará con datos reales)
+
+function horasAfuera() {
+  if (!afuera) return null;
+  const h = afuera.d.hourly, ahora = Date.now(), out = [];
+  for (let i = 0; i < h.time.length && out.length < 12; i++) {
+    const t = new Date(h.time[i]).getTime();
+    if (t > ahora) out.push({ h: new Date(h.time[i]).getHours(), fuera: h.temperature_2m[i], lluvia: h.precipitation_probability ? h.precipitation_probability[i] : null });
+  }
+  return out;
+}
+
+function analizar() {
+  const L = datos.lecturas, aj = datos.ajustes, ult = L[L.length - 1];
+  const ts = L.map(x => x.t), hs = L.map(x => x.h);
+  const proyT = proyector(ts, 6, -10, 45), proyH = proyector(hs, 30, 0, 100);
+  const rt = pendiente(sinPicos(ts).slice(-20));
+  let alLimite = null, alFrio = null;
+  const base = proyT(0); // temperatura actual sin picos
+  for (let m = 1; m <= 90; m++) { if (!alLimite && base < aj.limite_t && proyT(m) >= aj.limite_t) alLimite = m; if (!alFrio && base >= 16 && proyT(m) < 16) alFrio = m; }
+  const cambio60 = proyT(60) - base;
+  const confianza = Math.abs(cambio60) < 0.4 ? 'Estable' : rt.r2 > 0.6 ? 'Probable' : 'Incierto';
+  const horas = horasAfuera();
+  let noche = null, minNoche = null, empana = false, lluviaMax = 0;
+  if (horas && horas.length) {
+    let tin = base; noche = horas.map(x => { tin += (x.fuera + ABRIGO - tin) / TAU_NOCHE; return { ...x, cab: tin }; });
+    minNoche = noche.reduce((a, b) => b.cab < a.cab ? b : a);
+    empana = Math.min(...noche.map(x => x.fuera)) < rocio(ult.t, ult.h);
+    lluviaMax = Math.max(0, ...noche.map(x => x.lluvia || 0));
+  }
+  let v;
+  if (alLimite) v = { alerta: true, txt: `Llega a ${aj.limite_t}° en ~${alLimite} min: ventila` };
+  else if (ult.t >= aj.limite_t) v = { alerta: true, txt: `Arriba de ${aj.limite_t}°: abre una ventana` };
+  else if (proyH(60) >= aj.limite_h) v = { alerta: true, txt: `Humedad a ${Math.round(proyH(60))}% en 1 h: ventila` };
+  else if (alFrio) v = { alerta: true, txt: `Baja de 16° en ~${alFrio} min: cierra la ventana` };
+  else if (minNoche && minNoche.cab < 16) v = { alerta: true, txt: `De noche baja a ${n1(minNoche.cab)}°: cobija extra` };
+  else if (Math.abs(cambio60) >= 1) v = { alerta: false, txt: `${cambio60 > 0 ? 'Sube' : 'Baja'} ~${n1(Math.abs(cambio60))}° en la próxima hora` };
+  else if (empana) v = { alerta: false, txt: 'Esta noche se empañan los vidrios' };
+  else v = { alerta: false, txt: 'Todo estable la próxima hora' };
+  return { ult, aj, base, proyT, proyH, alLimite, cambio60, confianza, rt, noche, minNoche, empana, lluviaMax, v };
+}
+
+// ---------- Pintar ----------
+function mostrar(cual) {
+  $('config').hidden = cual !== 'config'; $('tablero').hidden = cual !== 'tablero'; $('vacio').hidden = cual !== 'vacio';
+  if (cual === 'config') { const c = leerConfig() || {}; $('cUrl').value = c.url || ''; $('cClave').value = c.clave || ''; }
+}
+function hace(seg) {
+  if (seg < 90) return 'hace 1 min';
+  if (seg < 3600) return `hace ${Math.round(seg / 60)} min`;
+  if (seg < 86400) return `hace ${Math.round(seg / 3600)} h`;
+  return `hace ${Math.round(seg / 86400)} días`;
+}
+function barras(id, vals, etiquetas, lim, ejesId, fmt, alertaSi) {
+  const lo = Math.min(...vals, lim ?? Infinity), hi = Math.max(...vals, lim ?? -Infinity);
+  const piso = Math.floor(lo - 1), techo = Math.ceil(hi + 0.5);
+  const pct = v => Math.max(3, (v - piso) / (techo - piso) * 100);
+  $(id).innerHTML = vals.map((v, i) => {
+    const ultima = i === vals.length - 1 && etiquetas[i] === 'Ahora';
+    const cls = ultima ? 'b abierta' : alertaSi && alertaSi(v) ? 'b alerta' : 'b';
+    return `<div class="${cls}" style="height:${pct(v)}%"><i>${fmt(v)}</i></div>`;
+  }).join('') + (lim != null ? `<div class="lim" style="bottom:${pct(lim)}%"></div>` : '');
+  $(ejesId).innerHTML = etiquetas.map(e => `<span>${e}</span>`).join('');
+}
+function porCuartos(L, campo) { // barras de 15 minutos para las últimas 3 horas
+  const ahora = datos.ahora, grupos = [];
+  for (let k = 11; k >= 0; k--) {
+    const a = ahora - (k + 1) * 900, b = ahora - k * 900;
+    const v = L.filter(x => x.epoch > a && x.epoch <= b).map(x => x[campo]);
+    grupos.push({ v: v.length ? prom(v) : null, et: k === 0 ? 'Ahora' : k % 4 === 0 ? `-${k / 4}h` : '' });
+  }
+  return grupos.filter(g => g.v != null);
+}
+
+function pintar() {
+  const L = datos.lecturas;
+  if (!L.length) {
+    mostrar('vacio');
+    $('vacio').innerHTML = '<p><b>Todavía no llegan lecturas.</b></p><p>En cuanto la placa de tinta se conecte al Wi-Fi, su primer minuto aparece aquí.</p>';
+    return;
+  }
+  mostrar('tablero');
+  const f = analizar(), { ult, aj } = f, edad = datos.ahora - ult.epoch;
+  $('tLugar').textContent = `Sensor · ${aj.lugar || 'Cabaña'}`;
+  $('tActual').textContent = `↻ Última lectura ${hace(edad)} · límite ${aj.limite_t}° y ${aj.limite_h}%`;
+  const chips = [];
+  if (ult.dispositivo === 'prueba') chips.push('<span class="chip">DATOS DE PRUEBA</span>');
+  if (edad > 600) chips.push(`<span class="chip rojo">LA PLACA NO REPORTA DESDE ${hace(edad).toUpperCase()}</span>`);
+  $('tChips').innerHTML = chips.join(' ');
+
+  const ult3 = L.filter(x => x.epoch > datos.ahora - 10800), t3 = ult3.map(x => x.t), h3 = ult3.map(x => x.h);
+  $('aT').textContent = `${n1(ult.t)}°C`;
+  $('aT2').textContent = `mín ${n1(Math.min(...t3))}° · máx ${n1(Math.max(...t3))}° (3 h)`;
+  $('aH').textContent = `${Math.round(ult.h)}%`;
+  $('aH2').innerHTML = ult.h >= aj.limite_h ? `<span class="rojo-t">▲ arriba de ${aj.limite_h}%</span>` : `límite ${aj.limite_h}%`;
+  $('aR').textContent = `${n1(rocio(ult.t, ult.h))}°C`;
+  if (afuera) {
+    const fa = afuera.d.current?.temperature_2m;
+    $('aF').textContent = fa != null ? `${n1(fa)}°C` : '–';
+    $('aF2').textContent = fa != null ? `${ult.t - fa >= 0 ? '+' : ''}${n1(ult.t - fa)}° adentro · Open-Meteo` : 'Open-Meteo';
+  } else { $('aF').textContent = '–'; $('aF2').textContent = 'sin pronóstico de afuera'; }
+
+  // pronóstico
+  $('pVer').innerHTML = (f.v.alerta ? '<span class="rojo-t">▲</span> ' : '✓ ') + f.v.txt;
+  const fl = d => `${d >= 0 ? '▲ +' : '▼ '}${n1(d)}° vs ahora`;
+  $('p30').textContent = `${n1(f.proyT(30))}°C`; $('p30b').textContent = fl(f.proyT(30) - f.base);
+  $('p60').textContent = `${n1(f.proyT(60))}°C`; $('p60b').textContent = fl(f.cambio60);
+  $('pLimN').textContent = aj.limite_t;
+  $('pLim').textContent = ult.t >= aj.limite_t ? 'ya' : f.alLimite ? `${f.alLimite} min` : 'no llega';
+  $('pLimb').innerHTML = f.alLimite ? '<span class="rojo-t">▲ ventila antes</span>' : ult.t >= aj.limite_t ? '<span class="rojo-t">▲ arriba del límite</span>' : 'en los próximos 90 min';
+  $('pConf').textContent = f.confianza;
+  $('pConfb').textContent = `tendencia ${f.rt.m >= 0 ? '+' : ''}${(f.rt.m * 10).toFixed(2)}°/10 min`;
+
+  // noche
+  if (f.noche) {
+    $('nVer').innerHTML = `Mínima de ${n1(f.minNoche.cab)}° a las ${hh(f.minNoche.h)}` +
+      (f.minNoche.cab < 16 ? ' <span class="rojo-t">· pide cobija extra</span>' : '') +
+      (f.empana ? ' · los vidrios se empañan' : '') + (f.lluviaMax >= 40 ? ` · lluvia ${f.lluviaMax}%` : '');
+    barras('nGraf', f.noche.map(x => x.cab), f.noche.map(x => `${x.h}h`), 16, 'nHoras', v => Math.round(v), v => v < 16);
+    $('nFuera').innerHTML = f.noche.map(x => `<span>${Math.round(x.fuera)}°</span>`).join('');
+    $('nLluvia').innerHTML = f.noche.map(x => `<span>${x.lluvia ?? '–'}%</span>`).join('');
+  } else {
+    $('nVer').textContent = 'Sin pronóstico de afuera por ahora.'; $('nGraf').innerHTML = ''; $('nHoras').innerHTML = ''; $('nFuera').innerHTML = ''; $('nLluvia').innerHTML = '';
+  }
+
+  // 3 horas
+  const gt = porCuartos(L, 't'), gh = porCuartos(L, 'h');
+  if (gt.length) {
+    const arriba = gt.filter(g => g.v >= aj.limite_t).length, lo = Math.min(...gt.map(g => g.v)), hi = Math.max(...gt.map(g => g.v));
+    $('gVer').textContent = arriba ? `${arriba} de ${gt.length} cuartos de hora arriba de ${aj.limite_t}°`
+      : hi - lo < 1.5 ? `Estable: entre ${n1(lo)} y ${n1(hi)}° en 3 horas` : `Se movió ${n1(hi - lo)}°, sin pasar del límite`;
+    barras('gGraf', gt.map(g => g.v), gt.map(g => g.et), aj.limite_t, 'gEjes', n1, v => v >= aj.limite_t);
+    const harr = gh.filter(g => g.v >= aj.limite_h).length;
+    $('hVer').textContent = harr ? `${harr} de ${gh.length} cuartos de hora arriba de ${aj.limite_h}%` : `Entre ${Math.round(Math.min(...gh.map(g => g.v)))} y ${Math.round(Math.max(...gh.map(g => g.v)))}% en 3 horas`;
+    barras('hGraf', gh.map(g => g.v), gh.map(g => g.et), aj.limite_h, 'hEjes', v => Math.round(v), v => v >= aj.limite_h);
+  }
+}
+
+// ---------- Eventos ----------
+$('config').addEventListener('submit', e => {
+  e.preventDefault();
+  const url = $('cUrl').value.trim();
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)) { $('cUrl').setCustomValidity('Debe ser la dirección /exec del puente.'); $('cUrl').reportValidity(); return; }
+  $('cUrl').setCustomValidity('');
+  guardarConfig({ url, clave: $('cClave').value.trim() }); datos = null; cargar();
+});
+$('cUrl').addEventListener('input', () => $('cUrl').setCustomValidity(''));
+$('actualizar').onclick = cargar;
+$('cambiar').onclick = () => mostrar('config');
+document.addEventListener('visibilitychange', () => { if (!document.hidden) cargar(); });
+setInterval(() => { if (!document.hidden) cargar(); }, 60000);
+cargar();
+</script>
+</body>
+</html>
