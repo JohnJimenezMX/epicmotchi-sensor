@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Sensor">
 <meta name="robots" content="noindex">
-<title>Sensor · Cabaña</title>
+<title>Sensor de temperatura y humedad</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -81,7 +81,7 @@ form.config input { font: 14px var(--mono); border: 2px solid var(--tinta); padd
 
   <div id="tablero" hidden>
     <div class="titulo">
-      <h1 id="tLugar">Sensor · Cabaña</h1>
+      <h1 id="tLugar">Sensor de temperatura y humedad</h1>
       <small id="tActual">–</small>
       <div id="tChips"></div>
     </div>
@@ -296,7 +296,6 @@ function pintar() {
   }
   mostrar('tablero');
   const f = analizar(), { ult, aj } = f, edad = datos.ahora - ult.epoch;
-  $('tLugar').textContent = `Sensor · ${aj.lugar || 'Cabaña'}`;
   $('tActual').textContent = `↻ Última lectura ${hace(edad)} · límite ${aj.limite_t}° y ${aj.limite_h}%`;
   const chips = [];
   if (ult.dispositivo === 'prueba') chips.push('<span class="chip">DATOS DE PRUEBA</span>');
