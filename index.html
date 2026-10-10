@@ -296,10 +296,10 @@ function pintar() {
   }
   mostrar('tablero');
   const f = analizar(), { ult, aj } = f, edad = datos.ahora - ult.epoch;
-  $('tActual').textContent = `↻ Última lectura ${hace(edad)} · límite ${aj.limite_t}° y ${aj.limite_h}%`;
+  $('tActual').textContent = `↻ Última lectura ${hace(edad)} · la placa reporta cada 5 min · límite ${aj.limite_t}° y ${aj.limite_h}%`;
   const chips = [];
   if (ult.dispositivo === 'prueba') chips.push('<span class="chip">DATOS DE PRUEBA</span>');
-  if (edad > 600) chips.push(`<span class="chip rojo">LA PLACA NO REPORTA DESDE ${hace(edad).toUpperCase()}</span>`);
+  if (edad > 900) chips.push(`<span class="chip rojo">LA PLACA NO REPORTA DESDE ${hace(edad).toUpperCase()}</span>`);
   $('tChips').innerHTML = chips.join(' ');
 
   const ult3 = L.filter(x => x.epoch > datos.ahora - 10800), t3 = ult3.map(x => x.t), h3 = ult3.map(x => x.h);
